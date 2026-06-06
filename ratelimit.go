@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"sync"
 	"time"
+	"strings"
 )
 
 type bucket struct {
@@ -73,6 +74,10 @@ func (rl *RateLimiter) Allow(ip, route string) bool {
 func (rl *RateLimiter) Middleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ip := r.RemoteAddr
+		// strip port number so all requests from same machine share a bucket
+		if i := strings.LastIndex(ip, ":"); i != -1 {
+			ip = ip[:i]
+		}
 		if !rl.Allow(ip, r.URL.Path) {
 			http.Error(w, "rate limit exceeded", http.StatusTooManyRequests)
 			return
