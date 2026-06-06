@@ -9,20 +9,32 @@ import (
 func main() {
 	log.SetOutput(os.Stdout)
 
+	usersService := os.Getenv("USERS_SERVICE")
+	if usersService == "" {
+		usersService = "http://localhost:3001"
+	}
+
+	ordersService := os.Getenv("ORDERS_SERVICE")
+	if ordersService == "" {
+		ordersService = "http://localhost:3002"
+	}
+
+	secret := os.Getenv("JWT_SECRET")
+	if secret != "" {
+		jwtSecret = []byte(secret)
+	}
+
 	routes := []Route{
-		{Prefix: "/api/users", Target: "http://localhost:3001"},
-		{Prefix: "/api/orders", Target: "http://localhost:3002"},
+		{Prefix: "/api/users", Target: usersService},
+		{Prefix: "/api/orders", Target: ordersService},
 	}
 
 	proxy := NewProxy(routes)
-	limiter := NewRateLimiter(10, 2) // 10 tokens max, refill 2 per second
+	limiter := NewRateLimiter(10, 2)
 
-	// chain: rate limit --> auth --> proxy
 	handler := limiter.Middleware(authMiddleware(proxy))
 
 	http.Handle("/", handler)
-
-	// token generator endpoint for testing (no auth required)
 	http.HandleFunc("/token", handleToken)
 
 	log.Println("gateway listening on :8080")

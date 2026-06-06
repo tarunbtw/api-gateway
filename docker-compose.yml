@@ -1,0 +1,26 @@
+version: "3.9"
+
+services:
+  gateway:
+    build:
+      context: .
+      dockerfile: Dockerfile.gateway
+    ports:
+      - "8080:8080"
+    environment:
+      - JWT_SECRET=supersecretkey
+      - USERS_SERVICE=http://users:3001
+      - ORDERS_SERVICE=http://orders:3002
+    depends_on:
+      - users
+      - orders
+
+  users:
+    build:
+      context: .
+      dockerfile: Dockerfile.users
+
+  orders:
+    build:
+      context: .
+      dockerfile: Dockerfile.orders
