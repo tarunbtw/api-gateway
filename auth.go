@@ -7,7 +7,7 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 )
 
-// in production this comes from an env var
+// DEMO fallback only — always set JWT_SECRET in real deployments.
 var jwtSecret = []byte("supersecretkey")
 
 func authMiddleware(next http.Handler) http.Handler {
@@ -41,7 +41,6 @@ func authMiddleware(next http.Handler) http.Handler {
 		next.ServeHTTP(w, r)
 	})
 }
-
 
 func generateToken(userID string) (string, error) {
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{

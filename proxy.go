@@ -9,8 +9,8 @@ import (
 )
 
 type Route struct {
-	Prefix  string
-	Target  string
+	Prefix string
+	Target string
 }
 
 type Proxy struct {

@@ -2,11 +2,12 @@ FROM golang:1.26-alpine AS builder
 WORKDIR /app
 COPY go.mod go.sum ./
 RUN go mod download
-COPY *.go ./
+COPY . .
 RUN CGO_ENABLED=0 go build -o gateway .
 
 FROM alpine:latest
 WORKDIR /app
 COPY --from=builder /app/gateway .
+COPY --from=builder /app/static ./static
 EXPOSE 8080
 CMD ["./gateway"]

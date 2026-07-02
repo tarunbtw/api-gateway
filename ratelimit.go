@@ -2,14 +2,14 @@ package main
 
 import (
 	"net/http"
+	"strings"
 	"sync"
 	"time"
-	"strings"
 )
 
 type bucket struct {
-	tokens   float64
-	maxTokens float64
+	tokens     float64
+	maxTokens  float64
 	refillRate float64 // tokens per second
 	lastRefill time.Time
 	mu         sync.Mutex
@@ -43,7 +43,8 @@ func (b *bucket) allow() bool {
 	return false
 }
 
-// RateLimiter tracks one bucket per IP per route
+// RateLimiter tracks one bucket per IP per route.
+// A background goroutine evicts buckets idle for >10 minutes to prevent unbounded memory growth.
 type RateLimiter struct {
 	buckets map[string]*bucket
 	mu      sync.Mutex
@@ -52,10 +53,31 @@ type RateLimiter struct {
 }
 
 func NewRateLimiter(maxTokens, refillPerSecond float64) *RateLimiter {
-	return &RateLimiter{
+	rl := &RateLimiter{
 		buckets: make(map[string]*bucket),
 		max:     maxTokens,
 		refill:  refillPerSecond,
+	}
+	go rl.sweepStale()
+	return rl
+}
+
+// sweepStale runs every 5 minutes and removes bucket entries that have had no
+// activity for more than 10 minutes, preventing unbounded memory growth.
+func (rl *RateLimiter) sweepStale() {
+	ticker := time.NewTicker(5 * time.Minute)
+	defer ticker.Stop()
+	for range ticker.C {
+		cutoff := time.Now().Add(-10 * time.Minute)
+		rl.mu.Lock()
+		for key, b := range rl.buckets {
+			b.mu.Lock()
+			if b.lastRefill.Before(cutoff) {
+				delete(rl.buckets, key)
+			}
+			b.mu.Unlock()
+		}
+		rl.mu.Unlock()
 	}
 }
 

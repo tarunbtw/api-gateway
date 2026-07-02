@@ -1,0 +1,1049 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>api-gateway</title>
+  <meta name="description"
+    content="A minimal Go API gateway — JWT auth, token-bucket rate limiting, reverse proxy. Live interactive demo." />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap"
+    rel="stylesheet">
+  <style>
+    :root {
+      --ink: #111111;
+      --paper: #ffffff;
+      --paper-alt: #f4f4f3;
+      --line: #e2e2e0;
+      --line-strong: #111111;
+      --gray-600: #5c5c5a;
+      --gray-400: #8f8f8c;
+      --gray-200: #cfcfcc;
+      --nav-bg: rgba(255, 255, 255, .86);
+      --radius: 10px;
+      --sans: 'Space Grotesk', system-ui, sans-serif;
+      --mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+    }
+
+    html.dark {
+      --ink: #f0f0ee;
+      --paper: #111111;
+      --paper-alt: #1c1c1a;
+      --line: #2a2a28;
+      --line-strong: #f0f0ee;
+      --gray-600: #9a9a96;
+      --gray-400: #636360;
+      --gray-200: #2e2e2c;
+      --nav-bg: rgba(17, 17, 17, .88);
+    }
+
+    *,
+    *::before,
+    *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    body {
+      background: var(--paper);
+      color: var(--ink);
+      font-family: var(--sans);
+      line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    ::selection {
+      background: var(--ink);
+      color: var(--paper);
+    }
+
+    a {
+      color: inherit;
+    }
+
+    button {
+      font-family: var(--sans);
+      cursor: pointer;
+      color: inherit;
+    }
+
+    .wrap {
+      max-width: 1040px;
+      margin: 0 auto;
+      padding: 0 28px;
+    }
+
+    /* ───────── nav ───────── */
+    nav {
+      position: sticky;
+      top: 0;
+      z-index: 40;
+      background: var(--nav-bg);
+      backdrop-filter: blur(8px);
+      border-bottom: 1px solid var(--line);
+    }
+
+    .theme-btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 34px;
+      height: 34px;
+      border-radius: 6px;
+      border: 1px solid var(--line);
+      background: transparent;
+      color: var(--gray-600);
+      transition: border-color .15s, color .15s, background .15s;
+      flex-shrink: 0;
+    }
+
+    .theme-btn:hover {
+      border-color: var(--ink);
+      color: var(--ink);
+      background: var(--paper-alt);
+    }
+
+    .theme-btn svg {
+      width: 16px;
+      height: 16px;
+      stroke: currentColor;
+      fill: none;
+      stroke-width: 2;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    nav .wrap {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      height: 60px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-weight: 600;
+      font-size: .95rem;
+      letter-spacing: -.01em;
+    }
+
+    .brand .dot {
+      width: 9px;
+      height: 9px;
+      border-radius: 2px;
+      background: var(--ink);
+      flex-shrink: 0;
+    }
+
+    .nav-links {
+      display: flex;
+      align-items: center;
+      gap: 28px;
+      font-size: .8rem;
+    }
+
+    .nav-links a {
+      text-decoration: none;
+      color: var(--gray-600);
+      transition: color .15s;
+    }
+
+    .nav-links a:hover {
+      color: var(--ink);
+    }
+
+    .nav-cta {
+      border: 1px solid var(--ink);
+      border-radius: 6px;
+      padding: 6px 14px;
+      font-size: .78rem;
+      font-weight: 600;
+      text-decoration: none;
+      color: var(--ink);
+      transition: background .15s, color .15s;
+    }
+
+    .nav-cta:hover {
+      background: var(--ink);
+      color: var(--paper);
+    }
+
+    /* ───────── hero ───────── */
+    header.hero {
+      padding: 76px 0 56px;
+    }
+
+    .eyebrow {
+      font-family: var(--mono);
+      font-size: .72rem;
+      letter-spacing: .09em;
+      color: var(--gray-600);
+      text-transform: uppercase;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 22px;
+    }
+
+    .eyebrow .pulse {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--ink);
+      animation: blink 1.8s infinite;
+    }
+
+    @keyframes blink {
+
+      0%,
+      100% {
+        opacity: 1
+      }
+
+      50% {
+        opacity: .15
+      }
+    }
+
+    h1.hero-title {
+      font-size: clamp(2.1rem, 5vw, 3.4rem);
+      font-weight: 700;
+      letter-spacing: -.02em;
+      line-height: 1.06;
+      max-width: 15ch;
+    }
+
+    .hero-sub {
+      margin-top: 20px;
+      max-width: 52ch;
+      color: var(--gray-600);
+      font-size: 1.02rem;
+    }
+
+    .hero-actions {
+      display: flex;
+      gap: 12px;
+      margin-top: 32px;
+      flex-wrap: wrap;
+    }
+
+    .btn {
+      border-radius: 6px;
+      padding: 11px 20px;
+      font-size: .85rem;
+      font-weight: 600;
+      border: 1px solid var(--ink);
+      transition: background .15s, color .15s, opacity .15s;
+    }
+
+    .btn-fill {
+      background: var(--ink);
+      color: var(--paper);
+    }
+
+    .btn-fill:hover {
+      opacity: .82;
+    }
+
+    .btn-line {
+      background: transparent;
+      color: var(--ink);
+    }
+
+    .btn-line:hover {
+      background: var(--paper-alt);
+    }
+
+    /* ── pipeline (signature element) ── */
+    .pipeline {
+      margin-top: 56px;
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      border: 1px solid var(--line-strong);
+      border-radius: var(--radius);
+      overflow: hidden;
+    }
+
+    .pipe-stage {
+      padding: 20px 22px;
+      border-left: 1px solid var(--line-strong);
+      position: relative;
+    }
+
+    .pipe-stage:first-child {
+      border-left: none;
+    }
+
+    .pipe-stage .idx {
+      font-family: var(--mono);
+      font-size: .7rem;
+      color: var(--gray-400);
+      display: block;
+      margin-bottom: 10px;
+    }
+
+    .pipe-stage h3 {
+      font-size: .92rem;
+      font-weight: 600;
+      margin-bottom: 6px;
+    }
+
+    .pipe-stage p {
+      font-size: .78rem;
+      color: var(--gray-600);
+    }
+
+    .pipe-stage::after {
+      content: '→';
+      position: absolute;
+      right: -11px;
+      top: 20px;
+      font-size: .9rem;
+      color: var(--gray-400);
+      background: var(--paper-alt);
+      width: 20px;
+      text-align: center;
+    }
+
+    .pipe-stage:last-child::after {
+      content: '';
+    }
+
+    /* ───────── section shell ───────── */
+    section {
+      padding: 64px 0;
+    }
+
+
+
+    .section-head {
+      margin-bottom: 32px;
+    }
+
+    .section-head .eyebrow {
+      margin-bottom: 10px;
+    }
+
+    .section-head h2 {
+      font-size: 1.5rem;
+      font-weight: 700;
+      letter-spacing: -.01em;
+    }
+
+    .section-head p {
+      color: var(--gray-600);
+      margin-top: 8px;
+      max-width: 56ch;
+      font-size: .92rem;
+    }
+
+    /* ───────── console ───────── */
+    .console {
+      border: 1px solid var(--line-strong);
+      border-radius: var(--radius);
+      overflow: hidden;
+    }
+
+    .console-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 18px;
+      border-bottom: 1px solid var(--line-strong);
+      background: var(--paper-alt);
+      font-family: var(--mono);
+      font-size: .72rem;
+      color: var(--gray-600);
+    }
+
+    .console-bar .session {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .session-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--gray-200);
+    }
+
+    .session-dot.on {
+      background: var(--ink);
+    }
+
+    .console-clear {
+      font-family: var(--mono);
+      font-size: .7rem;
+      background: transparent;
+      border: 1px solid var(--line);
+      border-radius: 5px;
+      padding: 4px 10px;
+      color: var(--gray-600);
+      transition: border-color .15s, color .15s;
+    }
+
+    .console-clear:hover {
+      border-color: var(--ink);
+      color: var(--ink);
+    }
+
+    .console-body {
+      display: grid;
+      grid-template-columns: 230px 1fr;
+      min-height: 340px;
+    }
+
+    .controls {
+      padding: 20px;
+      border-right: 1px solid var(--line);
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .ctrl-btn {
+      text-align: left;
+      background: var(--paper-alt);
+      border: 1px solid var(--line);
+      border-radius: 7px;
+      padding: 11px 13px;
+      font-size: .8rem;
+      font-weight: 500;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      transition: border-color .15s, background .15s;
+    }
+
+    .ctrl-btn:hover:not(:disabled) {
+      border-color: var(--ink);
+      background: var(--line);
+    }
+
+    .ctrl-btn:disabled {
+      opacity: .45;
+      cursor: not-allowed;
+    }
+
+    .ctrl-btn kbd {
+      font-family: var(--mono);
+      font-size: .65rem;
+      color: var(--gray-400);
+    }
+
+    .ctrl-note {
+      font-size: .7rem;
+      color: var(--gray-400);
+      margin-top: 6px;
+      line-height: 1.5;
+    }
+
+    .log {
+      font-family: var(--mono);
+      font-size: .76rem;
+      padding: 16px 18px;
+      overflow-y: auto;
+      max-height: 420px;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .log-empty {
+      color: var(--gray-400);
+      padding: 6px 2px;
+    }
+
+    .log-row {
+      display: grid;
+      grid-template-columns: 64px 1fr 90px 60px;
+      gap: 10px;
+      align-items: center;
+      padding: 7px 8px;
+      border-radius: 5px;
+    }
+
+    .log-row:hover {
+      background: var(--paper-alt);
+    }
+
+    .log-time {
+      color: var(--gray-400);
+    }
+
+    .log-path {
+      color: var(--ink);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .log-tag {
+      justify-self: start;
+      font-size: .68rem;
+      font-weight: 700;
+      letter-spacing: .02em;
+      padding: 2px 7px;
+      border-radius: 4px;
+      border: 1px solid var(--ink);
+    }
+
+    .log-tag.fill {
+      background: var(--ink);
+      color: var(--paper);
+    }
+
+    .log-tag.outline {
+      background: transparent;
+      color: var(--ink);
+    }
+
+    .log-tag.muted {
+      border-color: var(--gray-200);
+      color: var(--gray-400);
+    }
+
+    .log-ms {
+      color: var(--gray-400);
+      text-align: right;
+    }
+
+    .token-strip {
+      padding: 14px 18px;
+      border-top: 1px solid var(--line);
+      font-family: var(--mono);
+      font-size: .72rem;
+      color: var(--gray-600);
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .token-strip .tok-val {
+      color: var(--ink);
+      word-break: break-all;
+    }
+
+    /* ───────── architecture ───────── */
+    .arch-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      overflow: hidden;
+    }
+
+    .arch-cell {
+      padding: 18px;
+      border-left: 1px solid var(--line);
+    }
+
+    .arch-cell:first-child {
+      border-left: none;
+    }
+
+    .arch-cell .k {
+      font-family: var(--mono);
+      font-size: .68rem;
+      color: var(--gray-400);
+      display: block;
+      margin-bottom: 6px;
+    }
+
+    .arch-cell .v {
+      font-size: .88rem;
+      font-weight: 600;
+    }
+
+    .arch-cell .d {
+      font-size: .74rem;
+      color: var(--gray-600);
+      margin-top: 4px;
+    }
+
+    .arch-note {
+      margin-top: 18px;
+      font-size: .8rem;
+      color: var(--gray-600);
+      border-left: 2px solid var(--ink);
+      padding-left: 14px;
+    }
+
+    /* ───────── config table ───────── */
+    table.config {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: .82rem;
+    }
+
+    table.config th {
+      text-align: left;
+      font-family: var(--mono);
+      font-size: .68rem;
+      color: var(--gray-400);
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: .06em;
+      padding: 0 14px 10px;
+      border-bottom: 1px solid var(--line-strong);
+    }
+
+    table.config td {
+      padding: 12px 14px;
+      border-bottom: 1px solid var(--line);
+      vertical-align: top;
+    }
+
+    table.config code {
+      font-family: var(--mono);
+      font-size: .78rem;
+      background: var(--line);
+      padding: 2px 6px;
+      border-radius: 4px;
+    }
+
+    table.config tr:last-child td {
+      border-bottom: none;
+    }
+
+    /* ───────── footer ───────── */
+    footer {
+      padding: 36px 0 48px;
+    }
+
+    footer .wrap {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 14px;
+    }
+
+    .stack-list {
+      display: flex;
+      gap: 18px;
+      flex-wrap: wrap;
+      font-family: var(--mono);
+      font-size: .72rem;
+      color: var(--gray-600);
+    }
+
+    footer .fine {
+      font-size: .72rem;
+      color: var(--gray-400);
+    }
+
+    /* ───────── responsive ───────── */
+    @media (max-width:760px) {
+      .pipeline {
+        grid-template-columns: 1fr;
+      }
+
+      .pipe-stage {
+        border-left: none;
+        border-top: 1px solid var(--line-strong);
+      }
+
+      .pipe-stage:first-child {
+        border-top: none;
+      }
+
+      .pipe-stage::after {
+        content: '↓';
+        right: auto;
+        left: 20px;
+        top: auto;
+        bottom: -11px;
+      }
+
+      .pipe-stage:last-child::after {
+        content: '';
+      }
+
+      .console-body {
+        grid-template-columns: 1fr;
+      }
+
+      .controls {
+        border-right: none;
+        border-bottom: 1px solid var(--line);
+        flex-direction: row;
+        flex-wrap: wrap;
+      }
+
+      .ctrl-btn {
+        flex: 1 1 160px;
+      }
+
+      .arch-grid {
+        grid-template-columns: 1fr 1fr;
+      }
+
+      .arch-cell:nth-child(3) {
+        border-left: none;
+      }
+
+      .log-row {
+        grid-template-columns: 52px 1fr 76px;
+      }
+
+      .log-ms {
+        display: none;
+      }
+    }
+
+    @media (prefers-reduced-motion:reduce) {
+      .eyebrow .pulse {
+        animation: none;
+      }
+    }
+  </style>
+</head>
+
+<body>
+
+  <nav>
+    <div class="wrap">
+      <a class="brand" href="/" style="text-decoration:none;"><span class="dot"></span>api-gateway</a>
+      <div class="nav-links">
+        <a href="#console">Console</a>
+        <a href="#architecture">Architecture</a>
+        <a href="#config">Config</a>
+      </div>
+      <!-- TODO: update repo link -->
+      <div style="display:flex;align-items:center;gap:8px;">
+        <a class="nav-cta" href="https://github.com/tarunbtw/api-gateway" target="_blank" rel="noopener">Source</a>
+        <button class="theme-btn" id="btn-theme" onclick="toggleTheme()" aria-label="Toggle dark mode" title="Toggle dark mode">
+          <svg id="theme-icon" viewBox="0 0 24 24">
+            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+  </nav>
+
+  <header class="hero">
+    <div class="wrap">
+      <h1 class="hero-title">A simple api gateway.</h1>
+      <p class="hero-sub">JWT authentication, token-bucket rate limiting, and reverse proxying — no framework, no queue,
+        one binary. Everything below is a real request against this running instance.</p>
+      <div class="hero-actions">
+        <button class="btn btn-fill" onclick="scrollToConsole()">Open the console</button>
+        <a class="btn btn-line" href="#architecture">How it's built</a>
+      </div>
+
+      <div class="pipeline">
+        <div class="pipe-stage">
+          <span class="idx">01 — AUTHENTICATE</span>
+          <h3>Validate JWT</h3>
+          <p>Rejects missing or invalid tokens with 401 before anything else runs.</p>
+        </div>
+        <div class="pipe-stage">
+          <span class="idx">02 — THROTTLE</span>
+          <h3>Check rate limit</h3>
+          <p>Token bucket per IP, per route. Exhausted buckets get 429.</p>
+        </div>
+        <div class="pipe-stage">
+          <span class="idx">03 — ROUTE</span>
+          <h3>Proxy upstream</h3>
+          <p>Prefix match, strip, forward — full method, headers, and body.</p>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <section id="console">
+    <div class="wrap">
+      <div class="section-head">
+        <div class="eyebrow">interactive</div>
+        <h2>Run requests against the live gateway</h2>
+        <p>Each action below sends a real HTTP request from your browser to this instance. Responses land in the log on
+          the right, in the order they return.</p>
+      </div>
+
+      <div class="console">
+        <div class="console-bar">
+          <div class="session"><span class="session-dot" id="session-dot"></span><span id="session-label">no session token</span></div>
+          <button class="console-clear" id="btn-clear" onclick="clearLog()">Clear</button>
+          <span id="clock"></span>
+        </div>
+        <div class="console-body">
+          <div class="controls">
+            <button class="ctrl-btn" id="btn-token" onclick="getToken()">
+              Generate token <kbd>/token</kbd>
+            </button>
+            <button class="ctrl-btn" id="btn-users" onclick="callRoute('/api/users/123')" disabled>
+              Call users <kbd>GET</kbd>
+            </button>
+            <button class="ctrl-btn" id="btn-orders" onclick="callRoute('/api/orders/456')" disabled>
+              Call orders <kbd>GET</kbd>
+            </button>
+            <button class="ctrl-btn" id="btn-noauth" onclick="callNoAuth()">
+              Call without token <kbd>401</kbd>
+            </button>
+            <button class="ctrl-btn" id="btn-hammer" onclick="hammer()" disabled>
+              Send 15 requests <kbd>429</kbd>
+            </button>
+            <p class="ctrl-note">Generate a token to unlock the protected calls. The rate limiter resets after a few
+              seconds of idle time.</p>
+          </div>
+          <div class="log" id="log">
+            <div class="log-empty">— waiting for first request —</div>
+          </div>
+        </div>
+        <div class="token-strip">
+          <span>token —</span>
+          <span class="tok-val" id="token-val">none generated yet</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="architecture">
+    <div class="wrap">
+      <div class="section-head">
+        <div class="eyebrow">architecture</div>
+        <h2>One container, three roles</h2>
+        <p>For this demo deployment, the gateway and both upstream services run as one process on one port. In
+          production they'd ship as separate services — nothing about the routing logic changes either way.</p>
+      </div>
+
+      <div class="arch-grid">
+        <div class="arch-cell">
+          <span class="k">entry</span>
+          <span class="v">:8080</span>
+          <p class="d">Public port. Auth, rate limiting, and routing all happen here.</p>
+        </div>
+        <div class="arch-cell">
+          <span class="k">/api/users</span>
+          <span class="v">127.0.0.1:3001</span>
+          <p class="d">In-process upstream, unreachable from outside the container.</p>
+        </div>
+        <div class="arch-cell">
+          <span class="k">/api/orders</span>
+          <span class="v">127.0.0.1:3002</span>
+          <p class="d">Same isolation as users — internal only.</p>
+        </div>
+        <div class="arch-cell">
+          <span class="k">/health</span>
+          <span class="v">200 OK</span>
+          <p class="d">Liveness check for the platform's health probe.</p>
+        </div>
+      </div>
+
+      <p class="arch-note">Backend services trust the gateway completely — they implement no auth of their own.
+        Everything past the routing layer assumes the request already passed both checks.</p>
+    </div>
+  </section>
+
+  <section id="config">
+    <div class="wrap">
+      <div class="section-head">
+        <div class="eyebrow">configuration</div>
+        <h2>Environment</h2>
+        <p>Everything is injected at runtime. No secrets are committed to the image.</p>
+      </div>
+
+      <table class="config">
+        <thead>
+          <tr>
+            <th>Variable</th>
+            <th>Default</th>
+            <th>Purpose</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>JWT_SECRET</code></td>
+            <td><code>supersecretkey</code> (demo only)</td>
+            <td>HMAC key used to sign and verify tokens. Always override this outside of local dev.</td>
+          </tr>
+          <tr>
+            <td><code>USERS_SERVICE</code></td>
+            <td><code>localhost:3001</code></td>
+            <td>Upstream target for the <code>/api/users</code> prefix.</td>
+          </tr>
+          <tr>
+            <td><code>ORDERS_SERVICE</code></td>
+            <td><code>localhost:3002</code></td>
+            <td>Upstream target for the <code>/api/orders</code> prefix.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <footer>
+    <div class="wrap">
+      <div class="stack-list">
+        <span>Go 1.26</span>
+        <span>Docker</span>
+      </div>
+      <span class="fine">standard library HTTP</span>
+    </div>
+  </footer>
+
+  <script>
+    'use strict';
+
+    let token = null;
+
+    /* ── dark mode ── */
+    const MOON_PATH = 'M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z';
+    const SUN_PATH  = 'M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42M12 5a7 7 0 1 0 0 14A7 7 0 0 0 12 5z';
+
+    function applyTheme(dark) {
+      document.documentElement.classList.toggle('dark', dark);
+      const icon = document.getElementById('theme-icon');
+      // Rebuild the SVG path so it matches the current mode
+      icon.innerHTML = dark
+        ? `<path d="${SUN_PATH}"/>`
+        : `<path d="${MOON_PATH}"/>`;
+    }
+
+    function toggleTheme() {
+      const isDark = !document.documentElement.classList.contains('dark');
+      localStorage.setItem('theme', isDark ? 'dark' : 'light');
+      applyTheme(isDark);
+    }
+
+    // Initialise: respect saved preference, fall back to OS preference
+    (function initTheme() {
+      const saved = localStorage.getItem('theme');
+      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      applyTheme(saved ? saved === 'dark' : prefersDark);
+    })();
+
+    function scrollToConsole() {
+      document.getElementById('console').scrollIntoView({ behavior: 'smooth' });
+    }
+
+    function tick() {
+      document.getElementById('clock').textContent =
+        new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    }
+    tick(); setInterval(tick, 1000);
+
+    async function timedFetch(url, opts = {}) {
+      const t0 = performance.now();
+      try {
+        const res = await fetch(url, opts);
+        const ms = Math.round(performance.now() - t0);
+        let body;
+        try { body = await res.json(); } catch { body = await res.text().catch(() => ''); }
+        return { ok: res.ok, status: res.status, body, ms };
+      } catch (err) {
+        return { ok: false, status: 0, body: String(err), ms: Math.round(performance.now() - t0) };
+      }
+    }
+
+    function tagFor(status) {
+      if (status === 0) return { cls: 'muted', text: 'ERR' };
+      if (status < 300) return { cls: 'fill', text: String(status) };
+      if (status === 401) return { cls: 'outline', text: '401' };
+      if (status === 429) return { cls: 'outline', text: '429' };
+      return { cls: 'outline', text: String(status) };
+    }
+
+    function logRow(method, path, status, ms) {
+      const log = document.getElementById('log');
+      const empty = log.querySelector('.log-empty');
+      if (empty) empty.remove();
+
+      const t = tagFor(status);
+      const row = document.createElement('div');
+      row.className = 'log-row';
+      const now = new Date().toLocaleTimeString([], { hour12: false });
+      row.innerHTML = `
+    <span class="log-time">${now}</span>
+    <span class="log-path">${method} ${path}</span>
+    <span class="log-tag ${t.cls}">${t.text}</span>
+    <span class="log-ms">${ms}ms</span>
+  `;
+      log.prepend(row);
+    }
+
+    function setSession(on) {
+      document.getElementById('session-dot').classList.toggle('on', on);
+      document.getElementById('session-label').textContent = on ? 'session active' : 'no session token';
+    }
+
+    function setProtected(enabled) {
+      document.getElementById('btn-users').disabled = !enabled;
+      document.getElementById('btn-orders').disabled = !enabled;
+      document.getElementById('btn-hammer').disabled = !enabled;
+    }
+
+    async function getToken() {
+      const btn = document.getElementById('btn-token');
+      btn.disabled = true;
+      const { ok, status, body, ms } = await timedFetch('/token');
+      logRow('GET', '/token', status, ms);
+
+      if (ok && body && body.token) {
+        token = body.token;
+        document.getElementById('token-val').textContent = token;
+        setSession(true);
+        setProtected(true);
+      } else {
+        document.getElementById('token-val').textContent = 'request failed';
+      }
+      btn.disabled = false;
+    }
+
+    async function callRoute(path) {
+      if (!token) return;
+      const { status, ms } = await timedFetch(path, {
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      logRow('GET', path, status, ms);
+    }
+
+    async function callNoAuth() {
+      const { status, ms } = await timedFetch('/api/users/123');
+      logRow('GET', '/api/users/123', status, ms);
+    }
+
+    async function hammer() {
+      if (!token) return;
+      const btn = document.getElementById('btn-hammer');
+      btn.disabled = true;
+
+      const requests = Array.from({ length: 15 }, () =>
+        timedFetch('/api/users/123', { headers: { 'Authorization': `Bearer ${token}` } })
+      );
+      for (const p of requests) {
+        const { status, ms } = await p;
+        logRow('GET', '/api/users/123', status, ms);
+      }
+      btn.disabled = false;
+    }
+
+    async function pingHealth() {
+      const { status, ms } = await timedFetch('/health');
+      logRow('GET', '/health', status, ms);
+    }
+    pingHealth();
+
+    function clearLog() {
+      const log = document.getElementById('log');
+      log.innerHTML = '<div class="log-empty">— cleared —</div>';
+    }
+  </script>
+</body>
+
+</html>
